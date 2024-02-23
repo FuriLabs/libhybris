@@ -101,6 +101,9 @@ extern "C" {
     hwc2_error_t hwc2_compat_display_present(hwc2_compat_display_t* display,
                                      int32_t* outPresentFence);
 
+    hwc2_error_t hwc2_compat_display_set_active_config(hwc2_compat_display_t* display,
+                                                       HWC2DisplayConfig* config);
+
     hwc2_error_t hwc2_compat_display_set_client_target(hwc2_compat_display_t* display,
                                                uint32_t slot,
                                                struct ANativeWindowBuffer* buffer,

@@ -235,6 +235,21 @@ hwc2_error_t hwc2_compat_display_present(hwc2_compat_display_t* display,
     return static_cast<hwc2_error_t>(error);
 }
 
+hwc2_error_t hwc2_compat_display_set_active_config(hwc2_compat_display_t* display, HWC2DisplayConfig* config) {
+
+    HWC2::Display::Config::Builder builder(*(display->self), config->id);
+    builder.setWidth(config->width)
+           .setHeight(config->height)
+           .setVsyncPeriod(config->vsyncPeriod)
+           .setDpiX(static_cast<int32_t>(config->dpiX * 1000))
+           .setDpiY(static_cast<int32_t>(config->dpiY * 1000));
+
+    std::shared_ptr<const HWC2::Display::Config> sharedConfig = builder.build();
+    HWC2::Error error = display->self->setActiveConfig(sharedConfig);
+
+    return static_cast<hwc2_error_t>(error);
+}
+
 hwc2_error_t hwc2_compat_display_set_client_target(hwc2_compat_display_t* display,
                                             uint32_t slot,
                                             struct ANativeWindowBuffer* buffer,

@@ -67,6 +67,9 @@ HYBRIS_IMPLEMENT_FUNCTION2(hwc2, hwc2_error_t,
 HYBRIS_IMPLEMENT_FUNCTION2(hwc2, hwc2_error_t, hwc2_compat_display_present,
                            hwc2_compat_display_t*, int32_t*);
 
+HYBRIS_IMPLEMENT_FUNCTION2(hwc2, hwc2_error_t, hwc2_compat_display_set_active_config,
+                           hwc2_compat_display_t*, HWC2DisplayConfig*);
+
 HYBRIS_IMPLEMENT_FUNCTION5(hwc2, hwc2_error_t, hwc2_compat_display_set_client_target,
                            hwc2_compat_display_t*, uint32_t,
                            ANativeWindowBuffer_t*, int32_t,
