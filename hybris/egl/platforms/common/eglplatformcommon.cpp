@@ -73,6 +73,8 @@ extern "C" EGLBoolean eglplatformcommon_eglBindWaylandDisplayWL(EGLDisplay dpy, 
 
 extern "C" EGLBoolean eglplatformcommon_eglUnbindWaylandDisplayWL(EGLDisplay dpy, struct wl_display *display)
 {
+	server_wlegl *server = server_wlegl_from(dpy);
+	server_wlegl_destroy(server);
 	return EGL_TRUE;
 }
 

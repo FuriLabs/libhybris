@@ -200,6 +200,8 @@ server_wlegl_create(struct wl_display *display)
 void
 server_wlegl_destroy(server_wlegl *wlegl)
 {
+	wl_global_destroy(wlegl->global);
+	delete wlegl;
 	/* FIXME: server_wlegl_buffer objects may exist */
 
 	/* FIXME: remove global_ */
