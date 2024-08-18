@@ -3239,7 +3239,7 @@ static struct _hook hooks_common[] = {
     /* grp.h */
     HOOK_DIRECT_NO_DEBUG(getgrgid),
     /* C++ ABI */
-    HOOK_INDIRECT(__cxa_atexit),
+//    HOOK_INDIRECT(__cxa_atexit),
     HOOK_INDIRECT(__cxa_finalize),
     HOOK_INDIRECT(__cxa_thread_atexit),
     /* sys/prctl.h */
