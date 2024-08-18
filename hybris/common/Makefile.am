@@ -61,6 +61,8 @@ libhybris_common_la_CPPFLAGS = \
 	-I$(top_srcdir)/common \
 	-DLINKER_PLUGIN_DIR=\"$(libdir)/libhybris/linker\"
 
+libhybris_common_la_CFLAGS   += -Wno-incompatible-pointer-types
+
 if WANT_ADRENO_QUIRKS
 libhybris_common_la_CPPFLAGS += -DWANT_ADRENO_QUIRKS
 endif
