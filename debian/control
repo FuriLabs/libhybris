@@ -88,7 +88,7 @@ Description: Development files for libhardware
 
 Package: libhybris-common1
 Architecture: amd64 arm64 armhf i386
-Depends: libc6,
+Depends: libc6 (>= 2.40),
          libgcc-s1,
          libstdc++6,
 Description: Common library that contains the Android linker and custom hooks
