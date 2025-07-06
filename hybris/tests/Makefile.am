@@ -395,6 +395,6 @@ test_vulkan_CPPFLAGS = \
 	$(ANDROID_HEADERS_CFLAGS)
 test_vulkan_LDADD = \
 	$(top_builddir)/common/libhybris-common.la \
-	$(top_builddir)/vulkan/libvulkan.la \
+	$(top_builddir)/vulkan/libvulkan_hybris.la \
 	$(WAYLAND_CLIENT_LIBS)
 endif

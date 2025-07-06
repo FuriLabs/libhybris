@@ -369,6 +369,16 @@ AM_COND_IF([HAS_VULKAN_HEADERS], [AC_CONFIG_FILES([
 	vulkan/platforms/null/Makefile
 	vulkan/platforms/wayland/Makefile])])
 
+AC_ARG_ENABLE(vkicd,
+  [  --enable-vkicd                                 Enable Vulkan ICD support (default=auto)])
+AS_IF([test "x$enable_vkicd" = "x"], [
+  AS_IF([test "x$HAS_VULKAN_HEADERS" = "xyes"], [enable_vkicd=yes], [enable_vkicd=no])
+])
+AM_CONDITIONAL( [WANT_VKICD], [test "$enable_vkicd" = "yes"])
+AS_IF( [test "$enable_vkicd" = "yes"], [
+  AC_DEFINE([WANT_VKICD], [], [Enable Vulkan ICD support])
+])
+
 AC_OUTPUT
 
 echo

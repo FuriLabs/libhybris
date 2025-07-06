@@ -22,6 +22,7 @@
 #define VK_USE_PLATFORM_WAYLAND_KHR 1
 
 #include <vulkan/vulkan.h>
+#include <vulkan/vk_icd.h>
 #include <dlfcn.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,6 +34,30 @@
 #include "ws.h"
 
 static void *vulkan_handle = NULL;
+
+#define SUPPORTED_LOADER_ICD_INTERFACE_VERSION 5
+
+VKAPI_ATTR VkResult VKAPI_CALL vk_icdNegotiateLoaderICDInterfaceVersion(uint32_t* pSupportedVersion);
+VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vk_icdGetInstanceProcAddr(VkInstance instance, const char* pName);
+
+VKAPI_ATTR VkResult VKAPI_CALL vk_icdNegotiateLoaderICDInterfaceVersion(uint32_t* pSupportedVersion)
+{
+    if (*pSupportedVersion > SUPPORTED_LOADER_ICD_INTERFACE_VERSION) {
+        *pSupportedVersion = SUPPORTED_LOADER_ICD_INTERFACE_VERSION;
+    }
+    return VK_SUCCESS;
+}
+
+VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vk_icdGetInstanceProcAddr(VkInstance instance, const char* pName)
+{
+    if (!strcmp(pName, "vk_icdNegotiateLoaderICDInterfaceVersion")) {
+        return (PFN_vkVoidFunction)vk_icdNegotiateLoaderICDInterfaceVersion;
+    }
+    if (!strcmp(pName, "vk_icdGetInstanceProcAddr")) {
+        return (PFN_vkVoidFunction)vk_icdGetInstanceProcAddr;
+    }
+    return vkGetInstanceProcAddr(instance, pName);
+}
 
 /*
  * This generates a function that when first called overwrites it's plt entry with new address.
@@ -142,7 +167,11 @@ PFN_vkVoidFunction vkGetInstanceProcAddr(VkInstance instance, const char* pName)
         HYBRIS_DLSYSM(vulkan, &_vkGetInstanceProcAddr, "vkGetInstanceProcAddr");
     }
 
-    if (!strcmp(pName, "vkEnumerateInstanceExtensionProperties")) {
+    if (!strcmp(pName, "vk_icdNegotiateLoaderICDInterfaceVersion")) {
+        return (PFN_vkVoidFunction)vk_icdNegotiateLoaderICDInterfaceVersion;
+    } else if (!strcmp(pName, "vk_icdGetInstanceProcAddr")) {
+        return (PFN_vkVoidFunction)vk_icdGetInstanceProcAddr;
+    } else if (!strcmp(pName, "vkEnumerateInstanceExtensionProperties")) {
         return (PFN_vkVoidFunction)vkEnumerateInstanceExtensionProperties;
     } else if (!strcmp(pName, "vkCreateInstance")) {
         return (PFN_vkVoidFunction)vkCreateInstance;
