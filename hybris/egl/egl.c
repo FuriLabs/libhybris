@@ -86,6 +86,13 @@ static void (*_glEGLImageTargetRenderbufferStorageOES) (GLenum target, GLeglImag
 
 static __eglMustCastToProperFunctionPointerType (*_eglGetProcAddress)(const char *procname) = NULL;
 
+static EGLSyncKHR (*_eglCreateSyncKHR)(EGLDisplay dpy, EGLenum type, const EGLint *attrib_list) = NULL;
+static EGLBoolean (*_eglDestroySyncKHR)(EGLDisplay dpy, EGLSyncKHR sync) = NULL;
+static EGLint (*_eglClientWaitSyncKHR)(EGLDisplay dpy, EGLSyncKHR sync, EGLint flags, EGLTimeKHR timeout) = NULL;
+static EGLBoolean (*_eglWaitSyncKHR)(EGLDisplay dpy, EGLSyncKHR sync, EGLint flags) = NULL;
+static EGLBoolean (*_eglGetSyncAttribKHR)(EGLDisplay dpy, EGLSyncKHR sync, EGLint attribute, EGLint *value) = NULL;
+static EGLint (*_eglDupNativeFenceFDANDROID)(EGLDisplay dpy, EGLSyncKHR sync) = NULL;
+
 static void _init_androidegl()
 {
 	egl_handle = (void *) android_dlopen(getenv("LIBEGL") ? getenv("LIBEGL") : "libEGL.so", RTLD_LAZY);
@@ -663,6 +670,66 @@ EGLBoolean _my_eglDestroyImageKHR(EGLDisplay dpy, EGLImageKHR image)
 	return ret;
 }
 
+static EGLSyncKHR _my_eglCreateSyncKHR(EGLDisplay dpy, EGLenum type, const EGLint *attrib_list)
+{
+	HYBRIS_DLSYSM(egl, &_eglCreateSyncKHR, "eglCreateSyncKHR");
+	if (!_eglCreateSyncKHR) {
+		__eglHybrisSetError(EGL_BAD_DISPLAY);
+		return EGL_NO_SYNC_KHR;
+	}
+	return (*_eglCreateSyncKHR)(hybris_egl_get_real_display(dpy), type, attrib_list);
+}
+
+static EGLBoolean _my_eglDestroySyncKHR(EGLDisplay dpy, EGLSyncKHR sync)
+{
+	HYBRIS_DLSYSM(egl, &_eglDestroySyncKHR, "eglDestroySyncKHR");
+	if (!_eglDestroySyncKHR) {
+		__eglHybrisSetError(EGL_BAD_DISPLAY);
+		return EGL_FALSE;
+	}
+	return (*_eglDestroySyncKHR)(hybris_egl_get_real_display(dpy), sync);
+}
+
+static EGLint _my_eglClientWaitSyncKHR(EGLDisplay dpy, EGLSyncKHR sync, EGLint flags, EGLTimeKHR timeout)
+{
+	HYBRIS_DLSYSM(egl, &_eglClientWaitSyncKHR, "eglClientWaitSyncKHR");
+	if (!_eglClientWaitSyncKHR) {
+		__eglHybrisSetError(EGL_BAD_DISPLAY);
+		return EGL_FALSE;
+	}
+	return (*_eglClientWaitSyncKHR)(hybris_egl_get_real_display(dpy), sync, flags, timeout);
+}
+
+static EGLBoolean _my_eglWaitSyncKHR(EGLDisplay dpy, EGLSyncKHR sync, EGLint flags)
+{
+	HYBRIS_DLSYSM(egl, &_eglWaitSyncKHR, "eglWaitSyncKHR");
+	if (!_eglWaitSyncKHR) {
+		__eglHybrisSetError(EGL_BAD_DISPLAY);
+		return EGL_FALSE;
+	}
+	return (*_eglWaitSyncKHR)(hybris_egl_get_real_display(dpy), sync, flags);
+}
+
+static EGLBoolean _my_eglGetSyncAttribKHR(EGLDisplay dpy, EGLSyncKHR sync, EGLint attribute, EGLint *value)
+{
+	HYBRIS_DLSYSM(egl, &_eglGetSyncAttribKHR, "eglGetSyncAttribKHR");
+	if (!_eglGetSyncAttribKHR) {
+		__eglHybrisSetError(EGL_BAD_DISPLAY);
+		return EGL_FALSE;
+	}
+	return (*_eglGetSyncAttribKHR)(hybris_egl_get_real_display(dpy), sync, attribute, value);
+}
+
+static EGLint _my_eglDupNativeFenceFDANDROID(EGLDisplay dpy, EGLSyncKHR sync)
+{
+	HYBRIS_DLSYSM(egl, &_eglDupNativeFenceFDANDROID, "eglDupNativeFenceFDANDROID");
+	if (!_eglDupNativeFenceFDANDROID) {
+		__eglHybrisSetError(EGL_BAD_DISPLAY);
+		return -1;
+	}
+	return (*_eglDupNativeFenceFDANDROID)(hybris_egl_get_real_display(dpy), sync);
+}
+
 struct FuncNamePair {
 	const char * name;
 	__eglMustCastToProperFunctionPointerType func;
@@ -679,6 +746,14 @@ static struct FuncNamePair _eglHybrisOverrideFunctions[] = {
 	OVERRIDE_MY(glEGLImageTargetTexture2DOES),
 	OVERRIDE_MY(glEGLImageTargetRenderbufferStorageOES),
 	OVERRIDE_MY(eglDestroyImageKHR),
+
+	OVERRIDE_MY(eglCreateSyncKHR),
+	OVERRIDE_MY(eglDestroySyncKHR),
+	OVERRIDE_MY(eglClientWaitSyncKHR),
+	OVERRIDE_MY(eglWaitSyncKHR),
+	OVERRIDE_MY(eglGetSyncAttribKHR),
+	OVERRIDE_MY(eglDupNativeFenceFDANDROID),
+
 	OVERRIDE_SAMENAME(eglGetError),
 	OVERRIDE_SAMENAME(eglGetDisplay),
 	OVERRIDE_SAMENAME(eglGetPlatformDisplay),
