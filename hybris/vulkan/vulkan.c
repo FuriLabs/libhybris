@@ -40,6 +40,30 @@
 
 static void *vulkan_handle = NULL;
 
+#define SUPPORTED_LOADER_ICD_INTERFACE_VERSION 5
+
+VKAPI_ATTR VkResult VKAPI_CALL vk_icdNegotiateLoaderICDInterfaceVersion(uint32_t* pSupportedVersion);
+VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vk_icdGetInstanceProcAddr(VkInstance instance, const char* pName);
+
+VKAPI_ATTR VkResult VKAPI_CALL vk_icdNegotiateLoaderICDInterfaceVersion(uint32_t* pSupportedVersion)
+{
+    if (*pSupportedVersion > SUPPORTED_LOADER_ICD_INTERFACE_VERSION) {
+        *pSupportedVersion = SUPPORTED_LOADER_ICD_INTERFACE_VERSION;
+    }
+    return VK_SUCCESS;
+}
+
+VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vk_icdGetInstanceProcAddr(VkInstance instance, const char* pName)
+{
+    if (!strcmp(pName, "vk_icdNegotiateLoaderICDInterfaceVersion")) {
+        return (PFN_vkVoidFunction)vk_icdNegotiateLoaderICDInterfaceVersion;
+    }
+    if (!strcmp(pName, "vk_icdGetInstanceProcAddr")) {
+        return (PFN_vkVoidFunction)vk_icdGetInstanceProcAddr;
+    }
+    return vkGetInstanceProcAddr(instance, pName);
+}
+
 static void _init_androidvulkan()
 {
     vulkan_handle = (void *) android_dlopen(getenv("LIBVULKAN") ? getenv("LIBVULKAN") : "libvulkan.so", RTLD_LAZY);
@@ -209,6 +233,10 @@ PFN_vkVoidFunction vkGetInstanceProcAddr(VkInstance instance, const char* pName)
     } else if (!strcmp(pName, "vkCreateSwapchainKHR")) {
         return (PFN_vkVoidFunction)vkCreateSwapchainKHR;
 #endif
+    } else if (!strcmp(pName, "vk_icdNegotiateLoaderICDInterfaceVersion")) {
+        return (PFN_vkVoidFunction)vk_icdNegotiateLoaderICDInterfaceVersion;
+    } else if (!strcmp(pName, "vk_icdGetInstanceProcAddr")) {
+        return (PFN_vkVoidFunction)vk_icdGetInstanceProcAddr;
     }
 
     return (*_vkGetInstanceProcAddr)(instance, pName);
