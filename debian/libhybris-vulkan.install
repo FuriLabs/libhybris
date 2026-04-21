@@ -1,1 +1,2 @@
-usr/lib/*/libvulkan.*
+usr/lib/*/libvulkan_libhybris.*
+usr/share/vulkan/icd.d/libhybris_icd.json
