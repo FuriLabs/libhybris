@@ -59,6 +59,7 @@ struct WaylandDisplay {
 
 static bool init_done = false;
 static VkInstance g_instance = VK_NULL_HANDLE;
+static struct ws_vulkan_interface *g_vulkan_iface = NULL;
 
 /* Keep track of active Vulkan window surfaces */
 static std::map<VkSurfaceKHR,struct WaylandDisplay *> _surface_window_map;
@@ -112,6 +113,7 @@ extern "C" void waylandws_init_module(struct ws_vulkan_interface *vulkan_iface)
     if (init_done) {
         return;
     }
+    g_vulkan_iface = vulkan_iface;
     hybris_gralloc_initialize(0);
     vulkanplatformcommon_init(vulkan_iface);
     init_done = true;
@@ -163,22 +165,84 @@ void freeWaylandDisplay(WaylandDisplay *wdpy)
 static VkResult waylandws_vkEnumerateInstanceExtensionProperties(const char* pLayerName, uint32_t* pPropertyCount, VkExtensionProperties* pProperties)
 {
     VkResult res;
+    uint32_t original_count;
+    uint32_t driver_count;
 
     if (_vkEnumerateInstanceExtensionProperties == NULL) {
         _vkEnumerateInstanceExtensionProperties = (VkResult (*)(const char*, uint32_t*, VkExtensionProperties*))
-            (*_vkGetInstanceProcAddr)(NULL, "vkEnumerateInstanceExtensionProperties");
+            g_vulkan_iface->android_vulkan_dlsym("vkEnumerateInstanceExtensionProperties");
     }
 
-    res = (*_vkEnumerateInstanceExtensionProperties)(pLayerName, pPropertyCount, pProperties);
-    if (res == VK_SUCCESS && *pPropertyCount > 0 && pProperties != NULL) {
-        // Find and replace Android surface extension with wayland surface extension
-        uint32_t i;
-        for (i = 0; i < *pPropertyCount; i++) {
-            if (strcmp(pProperties[i].extensionName, VK_KHR_ANDROID_SURFACE_EXTENSION_NAME) == 0) {
-                strncpy(pProperties[i].extensionName, VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME, VK_MAX_EXTENSION_NAME_SIZE);
-            }
+    if (_vkEnumerateInstanceExtensionProperties == NULL) {
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
+
+    if (pPropertyCount == NULL) {
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
+
+    if (pProperties == NULL) {
+        res = (*_vkEnumerateInstanceExtensionProperties)(pLayerName, pPropertyCount, NULL);
+        if (res == VK_SUCCESS || res == VK_INCOMPLETE) {
+            *pPropertyCount += 2;
+        }
+        return res;
+    }
+
+    original_count = *pPropertyCount;
+    driver_count = original_count;
+
+    res = (*_vkEnumerateInstanceExtensionProperties)(pLayerName, &driver_count, pProperties);
+    if (res != VK_SUCCESS && res != VK_INCOMPLETE) {
+        *pPropertyCount = driver_count;
+        return res;
+    }
+
+    uint32_t out_count = driver_count;
+
+    for (uint32_t i = 0; i < out_count; i++) {
+        if (strcmp(pProperties[i].extensionName, VK_KHR_ANDROID_SURFACE_EXTENSION_NAME) == 0) {
+            strncpy(pProperties[i].extensionName, VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME, VK_MAX_EXTENSION_NAME_SIZE);
+            pProperties[i].extensionName[VK_MAX_EXTENSION_NAME_SIZE - 1] = '\0';
         }
     }
+
+    bool has_surface = false;
+    bool has_wayland_surface = false;
+
+    for (uint32_t i = 0; i < out_count; i++) {
+        if (strcmp(pProperties[i].extensionName, VK_KHR_SURFACE_EXTENSION_NAME) == 0) {
+            has_surface = true;
+        } else if (strcmp(pProperties[i].extensionName, VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME) == 0) {
+            has_wayland_surface = true;
+        }
+    }
+
+    if (!has_surface) {
+        if (out_count >= original_count) {
+            *pPropertyCount = out_count;
+            return VK_INCOMPLETE;
+        }
+
+        strncpy(pProperties[out_count].extensionName, VK_KHR_SURFACE_EXTENSION_NAME, VK_MAX_EXTENSION_NAME_SIZE);
+        pProperties[out_count].extensionName[VK_MAX_EXTENSION_NAME_SIZE - 1] = '\0';
+        pProperties[out_count].specVersion = VK_KHR_SURFACE_SPEC_VERSION;
+        out_count++;
+    }
+
+    if (!has_wayland_surface) {
+        if (out_count >= original_count) {
+            *pPropertyCount = out_count;
+            return VK_INCOMPLETE;
+        }
+
+        strncpy(pProperties[out_count].extensionName, VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME, VK_MAX_EXTENSION_NAME_SIZE);
+        pProperties[out_count].extensionName[VK_MAX_EXTENSION_NAME_SIZE - 1] = '\0';
+        pProperties[out_count].specVersion = VK_KHR_WAYLAND_SURFACE_SPEC_VERSION;
+        out_count++;
+    }
+
+    *pPropertyCount = out_count;
     return res;
 }
 
@@ -198,7 +262,12 @@ static VkResult waylandws_vkCreateInstance(const VkInstanceCreateInfo *pCreateIn
 
     if (_vkCreateInstance == NULL) {
         _vkCreateInstance = (VkResult (*)(const VkInstanceCreateInfo *, const VkAllocationCallbacks *, VkInstance *))
-            (*_vkGetInstanceProcAddr)(NULL, "vkCreateInstance");
+            g_vulkan_iface->android_vulkan_dlsym("vkCreateInstance");
+    }
+
+    if (_vkCreateInstance == NULL) {
+        free(enabledExtensions);
+        return VK_ERROR_INITIALIZATION_FAILED;
     }
 
     for (i = 0; i < pCreateInfo->enabledExtensionCount; i++) {
@@ -206,6 +275,10 @@ static VkResult waylandws_vkCreateInstance(const VkInstanceCreateInfo *pCreateIn
 
         // Skip unsupported VK_KHR_display on Wayland
         if (strcmp(ext, VK_KHR_DISPLAY_EXTENSION_NAME) == 0) {
+            continue;
+        }
+
+        if (strcmp(ext, VK_KHR_SURFACE_EXTENSION_NAME) == 0) {
             continue;
         }
 
@@ -266,6 +339,13 @@ static VkResult waylandws_vkCreateWaylandSurfaceKHR(VkInstance instance,
     if (_vkCreateAndroidSurfaceKHR == NULL) {
         _vkCreateAndroidSurfaceKHR = (VkResult (*)(VkInstance, const VkAndroidSurfaceCreateInfoKHR *, const VkAllocationCallbacks *, VkSurfaceKHR *))
             (*_vkGetInstanceProcAddr)(instance, "vkCreateAndroidSurfaceKHR");
+    }
+
+    if (_vkCreateAndroidSurfaceKHR == NULL) {
+        HYBRIS_ERROR("vkCreateAndroidSurfaceKHR not available");
+        delete wdpy;
+        HYBRIS_TRACE_END("hybris-vulkan", "vkCreateWaylandSurfaceKHR", "");
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
     }
 
     wdpy->wl_dpy = pCreateInfo->display;
@@ -357,6 +437,10 @@ static VkResult waylandws_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDe
             (*_vkGetInstanceProcAddr)(g_instance, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
     }
 
+    if (_vkGetPhysicalDeviceSurfaceCapabilitiesKHR == NULL) {
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+
     // Call the original function first
     result = (*_vkGetPhysicalDeviceSurfaceCapabilitiesKHR)(physicalDevice, surface, pSurfaceCapabilities);
 
@@ -382,6 +466,10 @@ static VkResult waylandws_vkCreateSwapchainKHR(VkDevice device, const VkSwapchai
         assert(g_instance != VK_NULL_HANDLE && "vkGetDeviceProcAddr requested before vkCreateInstance");
         _vkGetDeviceProcAddr = (PFN_vkVoidFunction (*)(VkDevice, const char *))
             (*_vkGetInstanceProcAddr)(g_instance, "vkGetDeviceProcAddr");
+    }
+
+    if (_vkGetDeviceProcAddr == NULL) {
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
     }
 
     if (_vkCreateSwapchainKHR == NULL) {
@@ -434,7 +522,11 @@ static void waylandws_vkDestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surf
 
         window->destroyWlEGLWindow();
         window->common.decRef(&window->common);
-        _vkDestroySurfaceKHR(instance, surface, pAllocator);
+
+        if (_vkDestroySurfaceKHR != NULL) {
+            _vkDestroySurfaceKHR(instance, surface, pAllocator);
+        }
+
         freeWaylandDisplay(wdpy);
     }
 }
