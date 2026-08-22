@@ -92,6 +92,10 @@ static __eglMustCastToProperFunctionPointerType (*_eglGetProcAddress)(const char
 static EGLBoolean  (*_eglGetConfigAttrib)(EGLDisplay dpy, EGLConfig config,
 		EGLint attribute, EGLint *value) = NULL;
 
+static EGLSyncKHR (*_eglCreateSyncKHR)(EGLDisplay dpy, EGLenum type, const EGLint *attrib_list) = NULL;
+static EGLBoolean (*_eglDestroySyncKHR)(EGLDisplay dpy, EGLSyncKHR sync) = NULL;
+static EGLint (*_eglDupNativeFenceFDANDROID)(EGLDisplay dpy, EGLSyncKHR sync) = NULL;
+
 static void _init_androidegl()
 {
 	egl_handle = (void *) android_dlopen(getenv("LIBEGL") ? getenv("LIBEGL") : "libEGL.so", RTLD_LAZY);
@@ -730,6 +734,36 @@ EGLBoolean _my_eglDestroyImage(EGLDisplay dpy, EGLImage image)
 	return _my_eglDestroyImageKHR(dpy, (EGLImageKHR) image);
 }
 
+static EGLSyncKHR _my_eglCreateSyncKHR(EGLDisplay dpy, EGLenum type, const EGLint *attrib_list)
+{
+	HYBRIS_DLSYSM(egl, &_eglCreateSyncKHR, "eglCreateSyncKHR");
+	if (!_eglCreateSyncKHR) {
+		__eglHybrisSetError(EGL_BAD_DISPLAY);
+		return EGL_NO_SYNC_KHR;
+	}
+	return (*_eglCreateSyncKHR)(hybris_egl_get_real_display(dpy), type, attrib_list);
+}
+
+static EGLBoolean _my_eglDestroySyncKHR(EGLDisplay dpy, EGLSyncKHR sync)
+{
+	HYBRIS_DLSYSM(egl, &_eglDestroySyncKHR, "eglDestroySyncKHR");
+	if (!_eglDestroySyncKHR) {
+		__eglHybrisSetError(EGL_BAD_DISPLAY);
+		return EGL_FALSE;
+	}
+	return (*_eglDestroySyncKHR)(hybris_egl_get_real_display(dpy), sync);
+}
+
+static EGLint _my_eglDupNativeFenceFDANDROID(EGLDisplay dpy, EGLSyncKHR sync)
+{
+	HYBRIS_DLSYSM(egl, &_eglDupNativeFenceFDANDROID, "eglDupNativeFenceFDANDROID");
+	if (!_eglDupNativeFenceFDANDROID) {
+		__eglHybrisSetError(EGL_BAD_DISPLAY);
+		return -1;
+	}
+	return (*_eglDupNativeFenceFDANDROID)(hybris_egl_get_real_display(dpy), sync);
+}
+
 struct FuncNamePair {
 	const char * name;
 	__eglMustCastToProperFunctionPointerType func;
@@ -748,6 +782,9 @@ static struct FuncNamePair _eglHybrisOverrideFunctions[] = {
 	OVERRIDE_MY(glEGLImageTargetRenderbufferStorageOES),
 	OVERRIDE_MY(eglDestroyImageKHR),
 	OVERRIDE_MY(eglDestroyImage),
+	OVERRIDE_MY(eglCreateSyncKHR),
+	OVERRIDE_MY(eglDestroySyncKHR),
+	OVERRIDE_MY(eglDupNativeFenceFDANDROID),
 	OVERRIDE_SAMENAME(eglGetError),
 	OVERRIDE_SAMENAME(eglGetDisplay),
 	OVERRIDE_SAMENAME(eglGetPlatformDisplay),
